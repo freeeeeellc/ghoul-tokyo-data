@@ -143,14 +143,31 @@ def load_archive():
         return json.load(open(ARCHIVE, encoding="utf-8"))
     return {"machine": None, "data": {}}
 
-def run_collect():
+def run_collect(dfrom=None, dto=None, force=False):
+    """PAPIMOから収集してアーカイブに蓄積。
+    - 既存の確定済み日（< 今日）はスキップして上書きしない（force=Trueで強制再取得）。
+    - 当日（>= 今日）は未確定なので常に更新する。
+    - dfrom/dto を YYYYMMDD で渡すと、その期間内の日付だけ収集対象にする。
+    """
     arch = load_archive()
     mid, bans, dates = discover()
     arch["machine"] = mid
     arch.setdefault("data", {})
+    today = datetime.date.today().strftime("%Y%m%d")
+    if dfrom:
+        dates = [d for d in dates if d >= dfrom]
+    if dto:
+        dates = [d for d in dates if d <= dto]
+    log("collect target dates: %d (%s)%s" % (
+        len(dates), (dates[0] + "〜" + dates[-1]) if dates else "-",
+        " [force]" if force else ""))
+    fetched = skipped = 0
     for ban in bans:
         slot = arch["data"].setdefault(ban, {})
         for d in dates:
+            if (not force) and (d in slot) and (d < today):
+                skipped += 1
+                continue  # 確定済み既存データは上書きしない
             rec = parse_detail(ban, d)
             g = rec.pop("_graph", None)
             if g:
@@ -162,10 +179,11 @@ def run_collect():
                         rec["note"] = note
                 except Exception as e:
                     log("  slump fail", ban, d, repr(e))
-            arch["data"][ban] = slot  # ensure ref
             slot[d] = rec
+            fetched += 1
             time.sleep(0.15)
-        log("collected 台", ban, "dates", len(dates))
+        log("台", ban, "done")
+    log("collect summary: fetched=%d skipped(existing)=%d" % (fetched, skipped))
     arch["updated_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     json.dump(arch, open(ARCHIVE, "w", encoding="utf-8"), ensure_ascii=False)
     return arch
@@ -220,10 +238,15 @@ def svg_slump(dates, per_day_curves, ends):
     s.append('</svg>')
     return "".join(s), int(round(cum))
 
-def generate(arch):
+def generate(arch, dfrom=None, dto=None, out="index"):
     data = arch["data"]
     bans = sorted(data.keys(), key=lambda x: int(x))
     all_dates = sorted({d for b in data for d in data[b]})
+    if dfrom:
+        all_dates = [d for d in all_dates if d >= dfrom]
+    if dto:
+        all_dates = [d for d in all_dates if d <= dto]
+    keep = set(all_dates)  # 描画対象（期間フィルタ後）
     dlab = lambda d: "%s/%s" % (d[4:6], d[6:])
     cols = [("BB", "BB"), ("RB", "RB"), ("BB率", "BB確率"), ("合成", "合成"),
             ("総スタート", "総ｽﾀｰﾄ"), ("ART", "ART"), ("ARTゲーム", "ARTｹﾞｰﾑ"),
@@ -247,7 +270,9 @@ def generate(arch):
          '<div class="idx">台ジャンプ：' + "".join('<a href="#m%s">%s番</a>' % (b, b) for b in bans) + '</div>']
     for b in bans:
         recs = data[b]
-        ds = sorted(recs.keys())
+        ds = sorted(d for d in recs.keys() if d in keep)
+        if not ds:
+            continue
         ends = {d: ci(recs[d].get("差枚", 0)) for d in ds}
         curves = {d: recs[d].get("curve", []) for d in ds}
         svg, net = svg_slump(ds, curves, ends)
@@ -272,9 +297,11 @@ def generate(arch):
             H.append('<tr><td>%s</td><td class="%s">%s%s</td>' % (dlab(d), dc, "+" if de >= 0 else "", format(de, ",")) + "".join('<td>%s</td>' % r.get(k, "-") for k, _ in cols) + '</tr>')
         H.append('</table></details></div>')
     H.append('</div></body></html>')
-    open(os.path.join(ROOT, "index.html"), "w", encoding="utf-8").write("".join(H))
-    # CSV（全履歴）
-    with open(os.path.join(ROOT, "data.csv"), "w", encoding="utf-8") as f:
+    html_path = os.path.join(ROOT, out + ".html")
+    csv_path = os.path.join(ROOT, ("data" if out == "index" else out) + ".csv")
+    open(html_path, "w", encoding="utf-8").write("".join(H))
+    # CSV（描画期間と同じ範囲）
+    with open(csv_path, "w", encoding="utf-8") as f:
         f.write("日付,台番,差枚,BB,RB,BB確率,合成確率,総スタート,ART,ARTゲーム数,最終スタート,最大出メダル\n")
         for d in all_dates:
             for b in bans:
@@ -286,7 +313,9 @@ def generate(arch):
                     r.get("BB", ""), r.get("RB", ""), r.get("BB率", ""), r.get("合成", ""),
                     r.get("総スタート", ""), r.get("ART", ""), r.get("ARTゲーム", ""),
                     r.get("最終", ""), r.get("最大出", "")]) + "\n")
-    log("generated index.html / data.csv (%d台, %d日)" % (len(bans), len(all_dates)))
+    log("generated %s / %s (%d台, %d日%s)" % (
+        os.path.basename(html_path), os.path.basename(csv_path), len(bans), len(all_dates),
+        " 期間 %s〜%s" % (all_dates[0], all_dates[-1]) if all_dates else ""))
 
 def git_push():
     def gx(*args):
@@ -301,13 +330,41 @@ def git_push():
     r = gx("push", "origin", "main")
     log("git push:", (r.stdout + r.stderr).strip()[-300:])
 
+def norm_date(s):
+    """'2026-07-01' / '2026/07/01' / '20260701' を 'YYYYMMDD' に正規化。"""
+    if not s:
+        return None
+    d = re.sub(r"\D", "", s)
+    if len(d) != 8:
+        raise SystemExit("日付は YYYY-MM-DD か YYYYMMDD 形式で指定してください: %r" % s)
+    return d
+
 def main():
-    log("=== run start ===")
+    import argparse
+    p = argparse.ArgumentParser(description="L 東京喰種データ収集・ページ生成")
+    p.add_argument("--from", dest="dfrom", help="期間開始 YYYY-MM-DD（収集・生成の両方に適用）")
+    p.add_argument("--to", dest="dto", help="期間終了 YYYY-MM-DD")
+    p.add_argument("--force", action="store_true", help="既存の確定済みデータも再取得して上書き")
+    p.add_argument("--no-collect", action="store_true", help="取得せずアーカイブから再生成のみ")
+    p.add_argument("--no-push", action="store_true", help="git push しない（ローカル確認用）")
+    p.add_argument("--out", default="index", help="出力名（既定 index → index.html/data.csv）。期間別ページ作成に使用")
+    a = p.parse_args()
+    dfrom, dto = norm_date(a.dfrom), norm_date(a.dto)
+    log("=== run start === args=%s" % vars(a))
     try:
-        arch = run_collect()
-        generate(arch)
-        git_push()
+        if a.no_collect:
+            arch = load_archive()
+            log("skip collect (--no-collect)")
+        else:
+            arch = run_collect(dfrom=dfrom, dto=dto, force=a.force)
+        generate(arch, dfrom=dfrom, dto=dto, out=a.out)
+        if a.no_push:
+            log("skip push (--no-push)")
+        else:
+            git_push()
         log("=== run done ===")
+    except SystemExit:
+        raise
     except Exception as e:
         log("FATAL", repr(e))
         sys.exit(1)
