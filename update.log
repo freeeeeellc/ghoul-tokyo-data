@@ -1,0 +1,9 @@
+[2026-06-30 21:56:36] === run start ===
+[2026-06-30 21:56:38] discovered machine=225010001 name=L 東京喰種 台=['703', '705', '706', '707', '708', '710'] dates=14
+[2026-06-30 21:56:46] collected 台 703 dates 14
+[2026-06-30 21:56:54] collected 台 705 dates 14
+[2026-06-30 21:57:02] collected 台 706 dates 14
+[2026-06-30 21:57:09] collected 台 707 dates 14
+[2026-06-30 21:57:17] collected 台 708 dates 14
+[2026-06-30 21:57:24] collected 台 710 dates 14
+[2026-06-30 21:57:25] generated index.html / data.csv (6台, 14日)
