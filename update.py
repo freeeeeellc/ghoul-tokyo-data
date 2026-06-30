@@ -249,8 +249,7 @@ def generate(arch, dfrom=None, dto=None, out="index"):
     keep = set(all_dates)  # 描画対象（期間フィルタ後）
     dlab = lambda d: "%s/%s" % (d[4:6], d[6:])
     cols = [("BB", "BB"), ("RB", "RB"), ("BB率", "BB確率"), ("合成", "合成"),
-            ("総スタート", "総ｽﾀｰﾄ"), ("ART", "ART"), ("ARTゲーム", "ARTｹﾞｰﾑ"),
-            ("最終", "最終ｽﾀｰﾄ"), ("最大出", "最大出メダル")]
+            ("総スタート", "総ｽﾀｰﾄ"), ("最終", "最終ｽﾀｰﾄ"), ("最大出", "最大出メダル")]
     H = ['<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>L 東京喰種 まとめ</title>',
          '<style>body{font-family:-apple-system,"Hiragino Kaku Gothic ProN",sans-serif;margin:0;background:#f3f3f3;color:#222}',
          '.wrap{max-width:1000px;margin:0 auto;padding:16px}h1{font-size:19px;margin:6px 0}',
@@ -280,15 +279,13 @@ def generate(arch, dfrom=None, dto=None, out="index"):
         sg = "+" if net >= 0 else ""
         BB = sum(ci(recs[d].get("BB")) for d in ds)
         RB = sum(ci(recs[d].get("RB")) for d in ds)
-        ART = sum(ci(recs[d].get("ART")) for d in ds)
         TS = sum(ci(recs[d].get("総スタート")) for d in ds)
-        ARTG = sum(ci(recs[d].get("ARTゲーム")) for d in ds)
         MAX = max([ci(recs[d].get("最大出")) for d in ds] or [0])
         g = "1/%.0f" % (TS / (BB + RB)) if BB + RB else "-"
         H.append('<div class="card" id="m%s"><div class="mh"><h2>%s番</h2><span class="net %s">全期間累計 %s%s枚</span></div>' % (b, b, cls, sg, format(net, ",")))
         H.append(svg)
-        H.append('<div class="tot">累計 → BB <b>%d</b>／RB <b>%d</b>／合成 <b>%s</b>／総スタート <b>%s</b>／ART <b>%d</b>／ARTゲーム <b>%s</b>／最大出メダル <b>%s</b>（%d日分）</div>'
-                 % (BB, RB, g, format(TS, ","), ART, format(ARTG, ","), format(MAX, ","), len(ds)))
+        H.append('<div class="tot">累計 → BB <b>%d</b>／RB <b>%d</b>／合成 <b>%s</b>／総スタート <b>%s</b>／最大出メダル <b>%s</b>（%d日分）</div>'
+                 % (BB, RB, g, format(TS, ","), format(MAX, ","), len(ds)))
         H.append('<details><summary>日別データ（全項目・新しい順）</summary><table><tr><th>日付</th><th>差枚</th>' + "".join('<th>%s</th>' % l for _, l in cols) + '</tr>')
         for d in reversed(ds):
             r = recs[d]
@@ -302,7 +299,7 @@ def generate(arch, dfrom=None, dto=None, out="index"):
     open(html_path, "w", encoding="utf-8").write("".join(H))
     # CSV（描画期間と同じ範囲）
     with open(csv_path, "w", encoding="utf-8") as f:
-        f.write("日付,台番,差枚,BB,RB,BB確率,合成確率,総スタート,ART,ARTゲーム数,最終スタート,最大出メダル\n")
+        f.write("日付,台番,差枚,BB,RB,BB確率,合成確率,総スタート,最終スタート,最大出メダル\n")
         for d in all_dates:
             for b in bans:
                 r = data[b].get(d)
@@ -311,8 +308,7 @@ def generate(arch, dfrom=None, dto=None, out="index"):
                 f.write(",".join(str(x) for x in [
                     "%s/%s/%s" % (d[:4], d[4:6], d[6:]), b, r.get("差枚", ""),
                     r.get("BB", ""), r.get("RB", ""), r.get("BB率", ""), r.get("合成", ""),
-                    r.get("総スタート", ""), r.get("ART", ""), r.get("ARTゲーム", ""),
-                    r.get("最終", ""), r.get("最大出", "")]) + "\n")
+                    r.get("総スタート", ""), r.get("最終", ""), r.get("最大出", "")]) + "\n")
     log("generated %s / %s (%d台, %d日%s)" % (
         os.path.basename(html_path), os.path.basename(csv_path), len(bans), len(all_dates),
         " 期間 %s〜%s" % (all_dates[0], all_dates[-1]) if all_dates else ""))
