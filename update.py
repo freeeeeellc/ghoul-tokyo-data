@@ -442,7 +442,8 @@ def generate(arch, dfrom=None, dto=None, out="index"):
         bban = best([(b, sum(1 for s in samples if s[0] == b),
                       (sum(s[3] for s in samples if s[0] == b) / max(1, sum(1 for s in samples if s[0] == b))), 0)
                      for b in bans])
-        bcell = max(cellmean.items(), key=lambda kv: kv[1][0]) if cellmean else None
+        solid = [kv for kv in cellmean.items() if kv[1][1] >= 5]  # 5件以上のマスのみ
+        bcell = max(solid, key=lambda kv: kv[1][0]) if solid else None
         rec = ['<div class="card" style="background:#fff7f9"><div class="mh"><h2>🎯 おすすめ（この店のクセの目安）</h2></div><div class="tot">']
         if bw:
             rec.append('・最も出やすい曜日：<b>%s曜</b>（平均 %s%s枚）<br>' % (WD[bw[0]], "+" if bw[2] >= 0 else "", format(int(round(bw[2])), ",")))
