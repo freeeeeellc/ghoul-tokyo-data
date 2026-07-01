@@ -143,6 +143,73 @@ def load_archive():
         return json.load(open(ARCHIVE, encoding="utf-8"))
     return {"machine": None, "data": {}}
 
+def slp_url(ban, mid, date):
+    return "%s/P-World/slp/%s/%s/%s/%s/43/1/18.png" % (BASE, HALL, ban, mid, date)
+
+def run_backfill(floor_days=400, stop_empty=21):
+    """差枚（スランプ）だけ過去に遡って埋める。
+    /view/（数値）は約14日しか遡れないが、/slp/ のグラフ画像はPAPIMOが保持する限り
+    数ヶ月前まで生成される。ここでは差枚と curve のみ補完（BB/RB等の数値は付かない）。
+    既に数値付きで存在する日（通常収集済み）は上書きしない。
+    """
+    arch = load_archive()
+    mid, bans, _ = discover()
+    arch["machine"] = mid
+    arch.setdefault("data", {})
+    # データのある日付範囲を bans[0] で特定（サイズ>1000B=実データ）
+    today = datetime.date.today()
+    have = []
+    empties = 0
+    d = today
+    for _ in range(floor_days):
+        ds = d.strftime("%Y%m%d")
+        try:
+            b = get(slp_url(bans[0], mid, ds), binary=True)
+            if len(b) > 1000:
+                have.append(ds)
+                empties = 0
+            else:
+                empties += 1
+        except Exception:
+            empties += 1
+        if empties >= stop_empty and have:
+            break
+        d -= datetime.timedelta(days=1)
+        time.sleep(0.05)
+    have = sorted(set(have))
+    if not have:
+        log("backfill: データ日付が見つかりません")
+        return arch
+    log("backfill range: %s〜%s (%d日)" % (have[0], have[-1], len(have)))
+    added = 0
+    for ban in bans:
+        slot = arch["data"].setdefault(ban, {})
+        for ds in have:
+            cur = slot.get(ds)
+            if cur and cur.get("差枚") is not None and cur.get("curve"):
+                continue  # 既存（数値付き通常収集など）は触らない
+            try:
+                curve, end, note = extract_slump(get(slp_url(ban, mid, ds), binary=True))
+            except Exception as e:
+                log("  backfill slump fail", ban, ds, repr(e))
+                continue
+            if not curve:
+                continue
+            rec = cur or {}
+            rec["差枚"] = end
+            rec["curve"] = curve
+            rec.setdefault("_hist", True)  # 数値なし・差枚のみの履歴
+            if note:
+                rec["note"] = note
+            slot[ds] = rec
+            added += 1
+            time.sleep(0.1)
+        log("backfill 台", ban, "done")
+    log("backfill added/updated: %d セル" % added)
+    arch["updated_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    json.dump(arch, open(ARCHIVE, "w", encoding="utf-8"), ensure_ascii=False)
+    return arch
+
 def run_collect(dfrom=None, dto=None, force=False):
     """PAPIMOから収集してアーカイブに蓄積。
     - 既存の確定済み日（< 今日）はスキップして上書きしない（force=Trueで強制再取得）。
@@ -355,13 +422,16 @@ def main():
     p.add_argument("--to", dest="dto", help="期間終了 YYYY-MM-DD")
     p.add_argument("--force", action="store_true", help="既存の確定済みデータも再取得して上書き")
     p.add_argument("--no-collect", action="store_true", help="取得せずアーカイブから再生成のみ")
+    p.add_argument("--backfill", action="store_true", help="差枚のみ過去へ遡って補完（数値は付かない）")
     p.add_argument("--no-push", action="store_true", help="git push しない（ローカル確認用）")
     p.add_argument("--out", default="index", help="出力名（既定 index → index.html/data.csv）。期間別ページ作成に使用")
     a = p.parse_args()
     dfrom, dto = norm_date(a.dfrom), norm_date(a.dto)
     log("=== run start === args=%s" % vars(a))
     try:
-        if a.no_collect:
+        if a.backfill:
+            arch = run_backfill()
+        elif a.no_collect:
             arch = load_archive()
             log("skip collect (--no-collect)")
         else:
