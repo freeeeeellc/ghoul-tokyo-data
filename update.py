@@ -262,11 +262,24 @@ def generate(arch, dfrom=None, dto=None, out="index"):
          'table{border-collapse:collapse;width:100%;font-size:11px;margin-top:6px}',
          'th,td{border:1px solid #ececec;padding:3px 5px;text-align:right;white-space:nowrap}',
          'th{background:#fafafa;color:#666}td:first-child,th:first-child{text-align:center}',
-         'tr.tr td{background:#fff7f9;font-weight:700}details>summary{cursor:pointer;font-size:12px;color:#999;margin:4px 0}</style></head><body><div class="wrap">',
+         'tr.tr td{background:#fff7f9;font-weight:700}details>summary{cursor:pointer;font-size:12px;color:#999;margin:4px 0}',
+         'table.sum{font-size:13px}table.sum th,table.sum td{padding:7px 10px;text-align:center}',
+         'table.sum th a{text-decoration:none;color:#333}table.sum tr td:first-child,table.sum tr th:first-child{color:#888;font-size:11px}',
+         'table.sum td{font-weight:700;font-size:14px}</style></head><body><div class="wrap">',
          '<h1>L 東京喰種 — 台別まとめ（スタジアム二俣川店）</h1>',
          '<div class="sub">機種ID %s／設置%d台／収集期間 %s〜%s／提供:PAPIMO（更新 %s）<br>スランプは全期間を<b>累積で連結</b>。差枚はグラフ画素から復元（精度±約150枚）。毎週自動更新。</div>'
          % (arch.get("machine"), len(bans), dlab(all_dates[0]) if all_dates else "-", dlab(all_dates[-1]) if all_dates else "-", arch.get("updated_at", "")),
          '<div class="idx">台ジャンプ：' + "".join('<a href="#m%s">%s番</a>' % (b, b) for b in bans) + '</div>']
+    # 全期間累計差枚（台別）一覧を最上部に
+    nets = {b: sum(ci(data[b][d].get("差枚", 0)) for d in data[b] if d in keep) for b in bans}
+    H.append('<div class="card"><div class="mh"><h2>全期間累計差枚（台別）</h2></div>'
+             '<table class="sum"><tr><th>台番</th>'
+             + "".join('<th><a href="#m%s">%s番</a></th>' % (b, b) for b in bans)
+             + '</tr><tr><td>累計差枚</td>'
+             + "".join('<td class="%s">%s%s</td>' % (
+                 "pos" if nets[b] >= 0 else "neg", "+" if nets[b] >= 0 else "", format(nets[b], ","))
+                 for b in bans)
+             + '</tr></table></div>')
     for b in bans:
         recs = data[b]
         ds = sorted(d for d in recs.keys() if d in keep)
