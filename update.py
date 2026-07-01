@@ -357,7 +357,108 @@ def generate(arch, dfrom=None, dto=None, out="index"):
             S.append('</table></details></div>')
         return "".join(S)
 
-    # タブ構成: 期間指定時は単一、通常は「直近14日」＋「全期間」
+    WD = ['月', '火', '水', '木', '金', '土', '日']
+
+    def cellbg(v):
+        # 平均差枚を緑(＋)/赤(−)の濃淡に。±3000で最大濃度。
+        t = max(-1.0, min(1.0, v / 3000.0))
+        if t >= 0:
+            return "background:rgba(10,143,60,%.2f)" % (0.10 + 0.35 * t)
+        return "background:rgba(209,42,74,%.2f)" % (0.10 + 0.35 * (-t))
+
+    def analysis_panel():
+        samples = []  # (ban, wd, tail, sashi)
+        for b in bans:
+            for d, rec in data[b].items():
+                if rec.get("差枚") is None:
+                    continue
+                try:
+                    wd = datetime.date(int(d[:4]), int(d[4:6]), int(d[6:8])).weekday()
+                except Exception:
+                    continue
+                samples.append((b, wd, int(d[7]), ci(rec.get("差枚", 0))))
+        n_all = len(samples)
+        A = ['<div class="card"><div class="mh"><h2>分析：曜日別・日付末尾別の平均差枚</h2></div>',
+             '<div class="tot">各区分の<b>平均差枚</b>（全6台・1台1日あたり）を、店の設定投入傾向の目安として集計。'
+             'プラスほど「その区分で出しやすい＝高設定が入りやすい」傾向を示します。'
+             '<b>期待値の保証ではなく</b>、差枚由来のためブレが大きく、サンプルが増えるほど精度が上がります'
+             '（現在 %d 台日分）。</div>' % n_all]
+
+        def agg(idx, keys):
+            rows = []
+            for k in keys:
+                xs = [s[3] for s in samples if s[idx] == k]
+                n = len(xs)
+                rows.append((k, n, (sum(xs) / n if n else 0),
+                             (100.0 * sum(1 for x in xs if x > 0) / n if n else 0)))
+            return rows
+
+        wd_rows = agg(1, range(7))
+        tail_rows = agg(2, range(10))
+
+        def best(rows, minn=1):
+            c = [r for r in rows if r[1] >= minn]
+            return max(c, key=lambda r: r[2]) if c else None
+
+        # 曜日別テーブル
+        A.append('<h3 style="font-size:14px;margin:16px 0 4px">▶ 曜日別</h3><table><tr><th>曜日</th>'
+                 + "".join('<th>%s</th>' % WD[r[0]] for r in wd_rows) + '</tr>')
+        A.append('<tr><td>平均差枚</td>' + "".join(
+            '<td class="%s" style="%s">%s%s</td>' % ("pos" if r[2] >= 0 else "neg", cellbg(r[2]),
+                                                     "+" if r[2] >= 0 else "", format(int(round(r[2])), ","))
+            for r in wd_rows) + '</tr>')
+        A.append('<tr><td>勝率</td>' + "".join('<td>%.0f%%</td>' % r[3] for r in wd_rows) + '</tr>')
+        A.append('<tr><td>サンプル</td>' + "".join('<td>%d</td>' % r[1] for r in wd_rows) + '</tr></table>')
+
+        # 日付末尾別テーブル
+        A.append('<h3 style="font-size:14px;margin:16px 0 4px">▶ 日付末尾別（○のつく日）</h3><table><tr><th>末尾</th>'
+                 + "".join('<th>%d</th>' % r[0] for r in tail_rows) + '</tr>')
+        A.append('<tr><td>平均差枚</td>' + "".join(
+            '<td class="%s" style="%s">%s%s</td>' % ("pos" if r[2] >= 0 else "neg", cellbg(r[2]),
+                                                     "+" if r[2] >= 0 else "", format(int(round(r[2])), ","))
+            for r in tail_rows) + '</tr>')
+        A.append('<tr><td>勝率</td>' + "".join('<td>%.0f%%</td>' % r[3] for r in tail_rows) + '</tr>')
+        A.append('<tr><td>サンプル</td>' + "".join('<td>%d</td>' % r[1] for r in tail_rows) + '</tr></table>')
+
+        # 曜日 × 台 ヒートマップ
+        A.append('<h3 style="font-size:14px;margin:16px 0 4px">▶ 曜日 × 台（平均差枚ヒートマップ）</h3>'
+                 '<table><tr><th>台＼曜日</th>' + "".join('<th>%s</th>' % w for w in WD) + '</tr>')
+        cellmean = {}
+        for b in bans:
+            row = ['<tr><td>%s番</td>' % b]
+            for k in range(7):
+                xs = [s[3] for s in samples if s[0] == b and s[1] == k]
+                m = sum(xs) / len(xs) if xs else 0
+                cellmean[(b, k)] = (m, len(xs))
+                row.append('<td style="%s">%s%s</td>' % (
+                    cellbg(m) if xs else "", ("+" if m >= 0 else "") if xs else "",
+                    format(int(round(m)), ",") if xs else "-"))
+            row.append('</tr>')
+            A.append("".join(row))
+        A.append('</table></div>')  # close first card
+
+        # おすすめ
+        bw, bt = best(wd_rows), best(tail_rows)
+        bban = best([(b, sum(1 for s in samples if s[0] == b),
+                      (sum(s[3] for s in samples if s[0] == b) / max(1, sum(1 for s in samples if s[0] == b))), 0)
+                     for b in bans])
+        bcell = max(cellmean.items(), key=lambda kv: kv[1][0]) if cellmean else None
+        rec = ['<div class="card" style="background:#fff7f9"><div class="mh"><h2>🎯 おすすめ（この店のクセの目安）</h2></div><div class="tot">']
+        if bw:
+            rec.append('・最も出やすい曜日：<b>%s曜</b>（平均 %s%s枚）<br>' % (WD[bw[0]], "+" if bw[2] >= 0 else "", format(int(round(bw[2])), ",")))
+        if bt:
+            rec.append('・最も出やすい日付末尾：<b>末尾%d の日</b>（平均 %s%s枚）<br>' % (bt[0], "+" if bt[2] >= 0 else "", format(int(round(bt[2])), ",")))
+        if bban:
+            rec.append('・最も出ている台：<b>%s番</b>（平均 %s%s枚/日）<br>' % (bban[0], "+" if bban[2] >= 0 else "", format(int(round(bban[2])), ",")))
+        if bcell and bcell[1][0] > 0:
+            rec.append('・最も熱い組合せ：<b>%s曜 × %s番</b>（平均 +%s枚, %d件）<br>' % (WD[bcell[0][1]], bcell[0][0], format(int(round(bcell[1][0])), ","), bcell[1][1]))
+        rec.append('<br><span style="color:#999">※あくまで過去傾向の目安。差枚ベースでブレが大きく、'
+                   'サンプルが少ない区分（サンプル数の小さいマス）は特に鵜呑み厳禁。'
+                   '実際に打つ日の当日判別・天井状況と併せて判断してください。</span></div></div>')
+        A.append("".join(rec))
+        return "".join(A)
+
+    # タブ構成: 期間指定時は単一、通常は「直近14日」＋「全期間」＋「分析」
     if dfrom or dto:
         rlabel = ("期間 %s〜%s" % (dlab(all_dates[0]), dlab(all_dates[-1]))) if all_dates else "期間"
         tabs = [("range", rlabel, all_dates, "期間")]
@@ -365,7 +466,8 @@ def generate(arch, dfrom=None, dto=None, out="index"):
         recent = all_dates[-14:]
         alllabel = ("全期間 %s〜（過去全部）" % dlab(all_dates[0])) if all_dates else "全期間"
         tabs = [("recent", "直近14日（数値あり）", recent, "直近14日"),
-                ("all", alllabel, all_dates, "全期間")]
+                ("all", alllabel, all_dates, "全期間"),
+                ("analysis", "分析（曜日・末尾）", None, "分析")]
 
     H = ['<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>L 東京喰種 まとめ</title>',
          '<style>body{font-family:-apple-system,"Hiragino Kaku Gothic ProN",sans-serif;margin:0;background:#f3f3f3;color:#222}',
@@ -394,7 +496,7 @@ def generate(arch, dfrom=None, dto=None, out="index"):
              for i, (k, label, _, _) in enumerate(tabs)) + '</div>']
     for i, (k, label, dates, netlabel) in enumerate(tabs):
         H.append('<div class="panel%s" id="panel-%s">' % (" on" if i == 0 else "", k))
-        H.append(section(dates, k, netlabel))
+        H.append(analysis_panel() if k == "analysis" else section(dates, k, netlabel))
         H.append('</div>')
     H.append('<script>document.querySelectorAll(".tabbtn").forEach(function(btn){btn.addEventListener("click",function(){'
              'document.querySelectorAll(".tabbtn").forEach(function(b){b.classList.remove("on")});'
