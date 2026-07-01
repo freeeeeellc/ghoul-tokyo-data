@@ -313,15 +313,64 @@ def generate(arch, dfrom=None, dto=None, out="index"):
         all_dates = [d for d in all_dates if d >= dfrom]
     if dto:
         all_dates = [d for d in all_dates if d <= dto]
-    keep = set(all_dates)  # 描画対象（期間フィルタ後）
     dlab = lambda d: "%s/%s" % (d[4:6], d[6:])
     cols = [("BB", "BB"), ("RB", "RB"), ("BB率", "BB確率"), ("合成", "合成"),
             ("総スタート", "総ｽﾀｰﾄ"), ("最終", "最終ｽﾀｰﾄ"), ("最大出", "最大出メダル")]
+
+    def section(keep, prefix, netlabel):
+        keep = set(keep)
+        S = []
+        nets = {b: sum(ci(data[b][d].get("差枚", 0)) for d in data[b] if d in keep) for b in bans}
+        S.append('<div class="card"><div class="mh"><h2>%s 累計差枚（台別）</h2></div>' % netlabel
+                 + '<table class="sum"><tr><th>台番</th>'
+                 + "".join('<th><a href="#%s-m%s">%s番</a></th>' % (prefix, b, b) for b in bans)
+                 + '</tr><tr><td>累計差枚</td>'
+                 + "".join('<td class="%s">%s%s</td>' % (
+                     "pos" if nets[b] >= 0 else "neg", "+" if nets[b] >= 0 else "", format(nets[b], ","))
+                     for b in bans)
+                 + '</tr></table></div>')
+        for b in bans:
+            recs = data[b]
+            ds = sorted(d for d in recs.keys() if d in keep)
+            if not ds:
+                continue
+            ends = {d: ci(recs[d].get("差枚", 0)) for d in ds}
+            curves = {d: recs[d].get("curve", []) for d in ds}
+            svg, net = svg_slump(ds, curves, ends)
+            cls = "pos" if net >= 0 else "neg"
+            sg = "+" if net >= 0 else ""
+            BB = sum(ci(recs[d].get("BB")) for d in ds)
+            RB = sum(ci(recs[d].get("RB")) for d in ds)
+            TS = sum(ci(recs[d].get("総スタート")) for d in ds)
+            MAX = max([ci(recs[d].get("最大出")) for d in ds] or [0])
+            g = "1/%.0f" % (TS / (BB + RB)) if BB + RB else "-"
+            S.append('<div class="card" id="%s-m%s"><div class="mh"><h2>%s番</h2><span class="net %s">%s累計 %s%s枚</span></div>' % (prefix, b, b, cls, netlabel, sg, format(net, ",")))
+            S.append(svg)
+            S.append('<div class="tot">累計 → BB <b>%d</b>／RB <b>%d</b>／合成 <b>%s</b>／総スタート <b>%s</b>／最大出メダル <b>%s</b>（%d日分）</div>'
+                     % (BB, RB, g, format(TS, ","), format(MAX, ","), len(ds)))
+            S.append('<details><summary>日別データ（全項目・新しい順）</summary><table><tr><th>日付</th><th>差枚</th>' + "".join('<th>%s</th>' % l for _, l in cols) + '</tr>')
+            for d in reversed(ds):
+                r = recs[d]
+                de = ends[d]
+                dc = "pos" if de >= 0 else "neg"
+                S.append('<tr><td>%s</td><td class="%s">%s%s</td>' % (dlab(d), dc, "+" if de >= 0 else "", format(de, ",")) + "".join('<td>%s</td>' % r.get(k, "-") for k, _ in cols) + '</tr>')
+            S.append('</table></details></div>')
+        return "".join(S)
+
+    # タブ構成: 期間指定時は単一、通常は「直近14日」＋「全期間」
+    if dfrom or dto:
+        rlabel = ("期間 %s〜%s" % (dlab(all_dates[0]), dlab(all_dates[-1]))) if all_dates else "期間"
+        tabs = [("range", rlabel, all_dates, "期間")]
+    else:
+        recent = all_dates[-14:]
+        alllabel = ("全期間 %s〜（過去全部）" % dlab(all_dates[0])) if all_dates else "全期間"
+        tabs = [("recent", "直近14日（数値あり）", recent, "直近14日"),
+                ("all", alllabel, all_dates, "全期間")]
+
     H = ['<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>L 東京喰種 まとめ</title>',
          '<style>body{font-family:-apple-system,"Hiragino Kaku Gothic ProN",sans-serif;margin:0;background:#f3f3f3;color:#222}',
          '.wrap{max-width:1000px;margin:0 auto;padding:16px}h1{font-size:19px;margin:6px 0}',
          '.sub{color:#777;font-size:12px;margin-bottom:12px;line-height:1.6}',
-         '.idx{font-size:12px;margin:8px 0 16px}.idx a{display:inline-block;margin:2px 6px 2px 0;padding:3px 9px;background:#fff;border-radius:14px;text-decoration:none;color:#333;border:1px solid #e0e0e0}',
          '.card{background:#fff;border-radius:10px;padding:14px 16px;margin-bottom:18px;box-shadow:0 1px 4px rgba(0,0,0,.07)}',
          '.mh{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}.mh h2{font-size:17px;margin:0}',
          '.net{font-weight:700;font-size:15px}.pos{color:#0a8f3c}.neg{color:#d12a4a}',
@@ -332,47 +381,26 @@ def generate(arch, dfrom=None, dto=None, out="index"):
          'tr.tr td{background:#fff7f9;font-weight:700}details>summary{cursor:pointer;font-size:12px;color:#999;margin:4px 0}',
          'table.sum{font-size:13px}table.sum th,table.sum td{padding:7px 10px;text-align:center}',
          'table.sum th a{text-decoration:none;color:#333}table.sum tr td:first-child,table.sum tr th:first-child{color:#888;font-size:11px}',
-         'table.sum td{font-weight:700;font-size:14px}</style></head><body><div class="wrap">',
+         'table.sum td{font-weight:700;font-size:14px}',
+         '.tabs{display:flex;gap:6px;margin:6px 0 16px;flex-wrap:wrap;position:sticky;top:0;background:#f3f3f3;padding:8px 0;z-index:5}',
+         '.tabbtn{border:1px solid #d8d8d8;background:#fff;color:#555;padding:8px 16px;border-radius:20px;font-size:13px;cursor:pointer}',
+         '.tabbtn.on{background:#e8285a;color:#fff;border-color:#e8285a;font-weight:700}',
+         '.panel{display:none}.panel.on{display:block}</style></head><body><div class="wrap">',
          '<h1>L 東京喰種 — 台別まとめ（スタジアム二俣川店）</h1>',
-         '<div class="sub">機種ID %s／設置%d台／収集期間 %s〜%s／提供:PAPIMO（更新 %s）<br>スランプは全期間を<b>累積で連結</b>。差枚はグラフ画素から復元（精度±約150枚）。毎週自動更新。</div>'
+         '<div class="sub">機種ID %s／設置%d台／収集期間 %s〜%s／提供:PAPIMO（更新 %s）<br>スランプは各タブ期間を<b>累積で連結</b>。差枚はグラフ画素から復元（精度±約150枚）。BB/RB等の数値は直近14日のみ。毎週自動更新。</div>'
          % (arch.get("machine"), len(bans), dlab(all_dates[0]) if all_dates else "-", dlab(all_dates[-1]) if all_dates else "-", arch.get("updated_at", "")),
-         '<div class="idx">台ジャンプ：' + "".join('<a href="#m%s">%s番</a>' % (b, b) for b in bans) + '</div>']
-    # 全期間累計差枚（台別）一覧を最上部に
-    nets = {b: sum(ci(data[b][d].get("差枚", 0)) for d in data[b] if d in keep) for b in bans}
-    H.append('<div class="card"><div class="mh"><h2>全期間累計差枚（台別）</h2></div>'
-             '<table class="sum"><tr><th>台番</th>'
-             + "".join('<th><a href="#m%s">%s番</a></th>' % (b, b) for b in bans)
-             + '</tr><tr><td>累計差枚</td>'
-             + "".join('<td class="%s">%s%s</td>' % (
-                 "pos" if nets[b] >= 0 else "neg", "+" if nets[b] >= 0 else "", format(nets[b], ","))
-                 for b in bans)
-             + '</tr></table></div>')
-    for b in bans:
-        recs = data[b]
-        ds = sorted(d for d in recs.keys() if d in keep)
-        if not ds:
-            continue
-        ends = {d: ci(recs[d].get("差枚", 0)) for d in ds}
-        curves = {d: recs[d].get("curve", []) for d in ds}
-        svg, net = svg_slump(ds, curves, ends)
-        cls = "pos" if net >= 0 else "neg"
-        sg = "+" if net >= 0 else ""
-        BB = sum(ci(recs[d].get("BB")) for d in ds)
-        RB = sum(ci(recs[d].get("RB")) for d in ds)
-        TS = sum(ci(recs[d].get("総スタート")) for d in ds)
-        MAX = max([ci(recs[d].get("最大出")) for d in ds] or [0])
-        g = "1/%.0f" % (TS / (BB + RB)) if BB + RB else "-"
-        H.append('<div class="card" id="m%s"><div class="mh"><h2>%s番</h2><span class="net %s">全期間累計 %s%s枚</span></div>' % (b, b, cls, sg, format(net, ",")))
-        H.append(svg)
-        H.append('<div class="tot">累計 → BB <b>%d</b>／RB <b>%d</b>／合成 <b>%s</b>／総スタート <b>%s</b>／最大出メダル <b>%s</b>（%d日分）</div>'
-                 % (BB, RB, g, format(TS, ","), format(MAX, ","), len(ds)))
-        H.append('<details><summary>日別データ（全項目・新しい順）</summary><table><tr><th>日付</th><th>差枚</th>' + "".join('<th>%s</th>' % l for _, l in cols) + '</tr>')
-        for d in reversed(ds):
-            r = recs[d]
-            de = ends[d]
-            dc = "pos" if de >= 0 else "neg"
-            H.append('<tr><td>%s</td><td class="%s">%s%s</td>' % (dlab(d), dc, "+" if de >= 0 else "", format(de, ",")) + "".join('<td>%s</td>' % r.get(k, "-") for k, _ in cols) + '</tr>')
-        H.append('</table></details></div>')
+         '<div class="tabs">' + "".join(
+             '<button class="tabbtn%s" data-t="%s">%s</button>' % (" on" if i == 0 else "", k, label)
+             for i, (k, label, _, _) in enumerate(tabs)) + '</div>']
+    for i, (k, label, dates, netlabel) in enumerate(tabs):
+        H.append('<div class="panel%s" id="panel-%s">' % (" on" if i == 0 else "", k))
+        H.append(section(dates, k, netlabel))
+        H.append('</div>')
+    H.append('<script>document.querySelectorAll(".tabbtn").forEach(function(btn){btn.addEventListener("click",function(){'
+             'document.querySelectorAll(".tabbtn").forEach(function(b){b.classList.remove("on")});'
+             'document.querySelectorAll(".panel").forEach(function(p){p.classList.remove("on")});'
+             'btn.classList.add("on");document.getElementById("panel-"+btn.dataset.t).classList.add("on");'
+             'window.scrollTo(0,0);})});</script>')
     H.append('</div></body></html>')
     html_path = os.path.join(ROOT, out + ".html")
     csv_path = os.path.join(ROOT, ("data" if out == "index" else out) + ".csv")
