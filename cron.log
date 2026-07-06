@@ -1,0 +1,5 @@
+[2026-07-06 10:00:38] === run start === args={'dfrom': None, 'dto': None, 'force': False, 'no_collect': False, 'backfill': False, 'no_push': False, 'out': 'index'}
+[2026-07-06 10:00:39]   retry 1 https://papimo.jp/P-World/hit/top/00042031/ URLError(gaierror(8, 'nodename nor servname provided, or not known'))
+[2026-07-06 10:00:40]   retry 2 https://papimo.jp/P-World/hit/top/00042031/ URLError(gaierror(8, 'nodename nor servname provided, or not known'))
+[2026-07-06 10:03:25]   retry 3 https://papimo.jp/P-World/hit/top/00042031/ ConnectionResetError(54, 'Connection reset by peer')
+[2026-07-06 10:03:26] FATAL RuntimeError('GET failed: https://papimo.jp/P-World/hit/top/00042031/')
