@@ -8,3 +8,16 @@
 [2026-07-13 10:31:50]   retry 2 https://papimo.jp/P-World/hit/top/00042031/ URLError(gaierror(8, 'nodename nor servname provided, or not known'))
 [2026-07-13 10:31:52]   retry 3 https://papimo.jp/P-World/hit/top/00042031/ URLError(gaierror(8, 'nodename nor servname provided, or not known'))
 [2026-07-13 10:31:53] FATAL RuntimeError('GET failed: https://papimo.jp/P-World/hit/top/00042031/')
+[2026-07-20 10:14:51] === run start === args={'dfrom': None, 'dto': None, 'force': False, 'no_collect': False, 'backfill': False, 'no_push': False, 'out': 'index'}
+[2026-07-20 10:14:53] discovered machine=225010001 name=L 東京喰種 台=['703', '705', '706', '707', '708', '710'] dates=14
+[2026-07-20 10:14:53] collect target dates: 14 (20260707〜20260720)
+[2026-07-20 10:15:02] 台 703 done
+[2026-07-20 10:15:08] 台 705 done
+[2026-07-20 10:15:16] 台 706 done
+[2026-07-20 10:15:30] 台 707 done
+[2026-07-20 10:23:40]   retry 1 https://papimo.jp/P-World/hit/view/00042031/708/20260718 URLError(gaierror(8, 'nodename nor servname provided, or not known'))
+[2026-07-20 10:23:42]   retry 2 https://papimo.jp/P-World/hit/view/00042031/708/20260718 URLError(gaierror(8, 'nodename nor servname provided, or not known'))
+[2026-07-20 10:23:48] 台 708 done
+[2026-07-20 10:23:53] 台 710 done
+[2026-07-20 10:23:53] collect summary: fetched=42 skipped(existing)=42
+[2026-07-20 10:23:53] generated index.html / data.csv (6台, 81日 期間 20260501〜20260720)
