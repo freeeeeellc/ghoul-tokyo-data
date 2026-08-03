@@ -38,3 +38,14 @@
 [2026-07-27 10:00:40] git push: To https://github.com/freeeeeellc/ghoul-tokyo-data.git
    22f8133..53ca5e8  main -> main
 [2026-07-27 10:00:40] === run done ===
+[2026-08-03 10:00:07] === run start === args={'dfrom': None, 'dto': None, 'force': False, 'no_collect': False, 'backfill': False, 'no_push': False, 'out': 'index'}
+[2026-08-03 10:00:09] discovered machine=225010001 name=L 東京喰種 台=['703', '705', '706', '707', '708', '710'] dates=14
+[2026-08-03 10:00:09] collect target dates: 14 (20260721〜20260803)
+[2026-08-03 10:00:14] 台 703 done
+[2026-08-03 10:00:18] 台 705 done
+[2026-08-03 10:00:21] 台 706 done
+[2026-08-03 10:00:25] 台 707 done
+[2026-08-03 10:00:29] 台 708 done
+[2026-08-03 10:00:33] 台 710 done
+[2026-08-03 10:00:33] collect summary: fetched=36 skipped(existing)=48
+[2026-08-03 10:00:33] generated index.html / data.csv (6台, 95日 期間 20260501〜20260803)
