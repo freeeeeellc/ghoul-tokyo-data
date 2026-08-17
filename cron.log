@@ -49,3 +49,22 @@
 [2026-08-03 10:00:33] 台 710 done
 [2026-08-03 10:00:33] collect summary: fetched=36 skipped(existing)=48
 [2026-08-03 10:00:33] generated index.html / data.csv (6台, 95日 期間 20260501〜20260803)
+[2026-08-03 10:00:36] git push: To https://github.com/freeeeeellc/ghoul-tokyo-data.git
+   a19912f..b738b5e  main -> main
+[2026-08-03 10:00:36] === run done ===
+[2026-08-10 10:08:37] === run start === args={'dfrom': None, 'dto': None, 'force': False, 'no_collect': False, 'backfill': False, 'no_push': False, 'out': 'index'}
+[2026-08-10 10:08:37]   retry 1 https://papimo.jp/P-World/hit/top/00042031/ URLError(gaierror(8, 'nodename nor servname provided, or not known'))
+[2026-08-10 10:08:39]   retry 2 https://papimo.jp/P-World/hit/top/00042031/ URLError(gaierror(8, 'nodename nor servname provided, or not known'))
+[2026-08-10 10:08:40]   retry 3 https://papimo.jp/P-World/hit/top/00042031/ URLError(gaierror(8, 'nodename nor servname provided, or not known'))
+[2026-08-10 10:08:42] FATAL RuntimeError('GET failed: https://papimo.jp/P-World/hit/top/00042031/')
+[2026-08-17 10:00:05] === run start === args={'dfrom': None, 'dto': None, 'force': False, 'no_collect': False, 'backfill': False, 'no_push': False, 'out': 'index'}
+[2026-08-17 10:00:09] discovered machine=225010001 name=L 東京喰種 台=['703', '705', '706', '707', '708', '710'] dates=14
+[2026-08-17 10:00:09] collect target dates: 14 (20260804〜20260817)
+[2026-08-17 10:00:22] 台 703 done
+[2026-08-17 10:00:35] 台 705 done
+[2026-08-17 10:00:48] 台 706 done
+[2026-08-17 10:01:01] 台 707 done
+[2026-08-17 10:01:14] 台 708 done
+[2026-08-17 10:01:28] 台 710 done
+[2026-08-17 10:01:28] collect summary: fetched=84 skipped(existing)=0
+[2026-08-17 10:01:28] generated index.html / data.csv (6台, 109日 期間 20260501〜20260817)
