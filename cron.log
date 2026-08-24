@@ -68,3 +68,18 @@
 [2026-08-17 10:01:28] 台 710 done
 [2026-08-17 10:01:28] collect summary: fetched=84 skipped(existing)=0
 [2026-08-17 10:01:28] generated index.html / data.csv (6台, 109日 期間 20260501〜20260817)
+[2026-08-17 10:01:31] git push: To https://github.com/freeeeeellc/ghoul-tokyo-data.git
+   b738b5e..e446043  main -> main
+[2026-08-17 10:01:31] === run done ===
+[2026-08-24 10:36:02] === run start === args={'dfrom': None, 'dto': None, 'force': False, 'no_collect': False, 'backfill': False, 'no_push': False, 'out': 'index'}
+[2026-08-24 10:36:08] discovered machine=225010001 name=L 東京喰種 台=['703', '705', '706', '707', '708', '710'] dates=14
+[2026-08-24 10:36:08] collect target dates: 14 (20260811〜20260824)
+[2026-08-24 10:36:14] 台 703 done
+[2026-08-24 10:36:20] 台 705 done
+[2026-08-24 10:36:32] 台 706 done
+[2026-08-24 10:45:07]   retry 1 https://s3-ap-northeast-1.amazonaws.com/storage.media.papimo.jp/hit_graph/000420310707225010001202608232255430118.png URLError(ConnectionResetError(54, 'Connection reset by peer'))
+[2026-08-24 10:45:13] 台 707 done
+[2026-08-24 10:45:26] 台 708 done
+[2026-08-24 10:45:33] 台 710 done
+[2026-08-24 10:45:33] collect summary: fetched=42 skipped(existing)=42
+[2026-08-24 10:45:33] generated index.html / data.csv (6台, 116日 期間 20260501〜20260824)
