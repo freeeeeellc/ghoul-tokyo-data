@@ -251,9 +251,22 @@ def run_collect(dfrom=None, dto=None, force=False):
             time.sleep(0.15)
         log("台", ban, "done")
     log("collect summary: fetched=%d skipped(existing)=%d" % (fetched, skipped))
+    _drop_placeholder_days(arch)
     arch["updated_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     json.dump(arch, open(ARCHIVE, "w", encoding="utf-8"), ensure_ascii=False)
     return arch
+
+def _drop_placeholder_days(arch):
+    """開店前などで全台の差枚が同一値になった日（グラフ未生成のプレースホルダ）を破棄。
+    実データで6台が完全一致することは事実上ないため、size==1 かつ 3台以上一致で不採用。"""
+    data = arch.get("data", {})
+    alld = sorted({d for b in data for d in data[b]})
+    for d in alld:
+        vals = [data[b][d].get("差枚") for b in data if d in data[b] and data[b][d].get("差枚") is not None]
+        if len(vals) >= 3 and len(set(vals)) == 1:
+            for b in data:
+                data[b].pop(d, None)
+            log("  drop placeholder day (全台同値 %s): %s" % (vals[0], d))
 
 # ---------- HTML / CSV 生成 ----------
 def ci(s):
